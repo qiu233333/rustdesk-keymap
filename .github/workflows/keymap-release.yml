@@ -304,17 +304,28 @@ jobs:
           fi
           ./build.py --flutter --hwcodec --unix-file-copy-paste --screencapturekit
       - name: Verify and package Apple Silicon app
+        id: package
         shell: bash
         run: |
           set -euo pipefail
           app=flutter/build/macos/Build/Products/Release/RustDesk.app
-          lipo -verify_arch arm64 "$app/Contents/MacOS/RustDesk"
+          lipo "$app/Contents/MacOS/RustDesk" -verify_arch arm64
           bash .github/scripts/sign-macos-app.sh "$app" - flutter/macos/Runner/Release.entitlements
+          test "$("$app/Contents/MacOS/RustDesk" --version)" = '1.5.3'
           stage=$(mktemp -d)
           ditto "$app" "$stage/RustDesk.app"
           ln -s /Applications "$stage/Applications"
           hdiutil create -volname 'RustDesk Keymap' -srcfolder "$stage" -format UDZO rustdesk-keymap-macos-arm64.dmg
           hdiutil verify rustdesk-keymap-macos-arm64.dmg
+      - name: Preserve the compiled app if packaging fails
+        if: failure() && steps.package.outcome == 'failure'
+        run: ditto -c -k --keepParent flutter/build/macos/Build/Products/Release/RustDesk.app macos-app.zip
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: failure() && steps.package.outcome == 'failure'
+        with:
+          name: macos-app-for-packaging
+          path: macos-app.zip
+          retention-days: 2
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: keymap-macos
