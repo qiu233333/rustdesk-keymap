@@ -52,6 +52,10 @@ use crate::common::GrabState;
 use crate::keyboard;
 use crate::{client::Data, client::Interface};
 
+#[cfg(any(all(feature = "flutter", any(windows, target_os = "macos")), test))]
+#[path = "keyboard/physical_keymap.rs"]
+mod physical_keymap;
+
 #[cfg(any(target_os = "android", target_os = "ios", test))]
 #[path = "platform/mobile_wheel.rs"]
 mod mobile_wheel;
@@ -60,6 +64,8 @@ const CHANGE_RESOLUTION_VALID_TIMEOUT_SECS: u64 = 15;
 
 #[derive(Clone, Default)]
 pub struct Session<T: InvokeUiSession> {
+    #[cfg(all(feature = "flutter", any(windows, target_os = "macos")))]
+    pub(crate) physical_keymap: Arc<Mutex<physical_keymap::KeyMap>>,
     pub password: String,
     pub args: Vec<String>,
     pub lc: Arc<RwLock<LoginConfigHandler>>,
@@ -326,6 +332,10 @@ impl<T: InvokeUiSession> Session<T> {
     }
 
     pub fn save_keyboard_mode(&self, value: String) {
+        #[cfg(all(feature = "flutter", any(windows, target_os = "macos")))]
+        if value != "map" {
+            self.release_mapped_keys();
+        }
         self.lc.write().unwrap().save_keyboard_mode(value);
     }
 
@@ -776,6 +786,10 @@ impl<T: InvokeUiSession> Session<T> {
 
         let mut msg = evt.clone();
         self.swap_modifier_key(&mut msg);
+        #[cfg(all(feature = "flutter", any(windows, target_os = "macos")))]
+        if !self.apply_physical_keymap(evt, &mut msg) {
+            return;
+        }
         let mut msg_out = Message::new();
         msg_out.set_key_event(msg);
         self.send(Data::Message(msg_out));
@@ -1322,6 +1336,8 @@ impl<T: InvokeUiSession> Session<T> {
             }
         }
         let round = connection_round_state_lock.new_round();
+        #[cfg(all(feature = "flutter", any(windows, target_os = "macos")))]
+        self.physical_keymap.lock().unwrap().release_all();
         drop(connection_round_state_lock);
 
         let cloned = self.clone();

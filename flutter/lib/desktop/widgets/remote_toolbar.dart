@@ -23,6 +23,7 @@ import '../../models/platform_model.dart';
 import '../../common/shared_state.dart';
 import './popup_menu.dart';
 import './kb_layout_type_chooser.dart';
+import './physical_keymap_editor.dart';
 import 'package:flutter_hbb/utils/scale.dart';
 import 'package:flutter_hbb/common/widgets/custom_scale_base.dart';
 
@@ -2582,6 +2583,16 @@ class _KeyboardMenu extends StatelessWidget {
         menuChildrenGetter: (_) => [
               keyboardMode(),
               localKeyboardType(),
+              if (!isWeb &&
+                  ((isWindows && pi.platform == kPeerPlatformMacOS) ||
+                      (isMacOS && pi.platform == kPeerPlatformWindows)) &&
+                  bind.sessionIsKeyboardModeSupported(
+                      sessionId: ffi.sessionId, mode: kKeyMapMode))
+                MenuButton(
+                  ffi: ffi,
+                  child: Text(translate('Custom key mapping')),
+                  onPressed: ffiModel.viewOnly ? null : editPhysicalKeymap,
+                ),
               inputSource(),
               Divider(),
               viewMode(),
@@ -2610,6 +2621,34 @@ class _KeyboardMenu extends StatelessWidget {
       }
     }
     return speedWidgets;
+  }
+
+  Future<void> editPhysicalKeymap() async {
+    final sessionId = ffi.sessionId;
+    final option =
+        isWindows ? 'keymap-windows-to-mac' : 'keymap-mac-to-windows';
+    final saved = await bind.sessionGetOption(sessionId: sessionId, arg: option);
+    if (saved == null) return;
+    final profile = await ffi.dialogManager.show<String>((_, close, context) {
+      return CustomAlertDialog(
+        title: Text(translate('Custom key mapping')),
+        content: PhysicalKeymapEditor(
+          saved: saved,
+          localMac: isMacOS,
+          label: translate,
+          onSave: (value) => close(value),
+          onCancel: () => close(),
+        ),
+        onCancel: close,
+      );
+    });
+    if (profile == null) return;
+    await bind.sessionPeerOption(
+        sessionId: sessionId, name: option, value: profile);
+    if (profile.isNotEmpty) {
+      await bind.sessionSetKeyboardMode(sessionId: sessionId, value: kKeyMapMode);
+      await ffi.inputModel.updateKeyboardMode();
+    }
   }
 
   keyboardMode() {

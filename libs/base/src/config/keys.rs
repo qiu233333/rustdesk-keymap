@@ -5,6 +5,8 @@
 
 pub use hbb_common::config::keys::*;
 
+pub const OPTION_KEYMAP_WINDOWS_TO_MAC: &str = "keymap-windows-to-mac";
+pub const OPTION_KEYMAP_MAC_TO_WINDOWS: &str = "keymap-mac-to-windows";
 pub const OPTION_VIEW_ONLY: &str = "view_only";
 pub const OPTION_SHOW_MONITORS_TOOLBAR: &str = "show_monitors_toolbar";
 pub const OPTION_SHOW_REMOTE_CURSOR: &str = "show_remote_cursor";
