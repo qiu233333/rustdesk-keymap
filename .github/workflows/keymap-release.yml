@@ -189,7 +189,7 @@ jobs:
 
   mac:
     name: Apple Silicon DMG
-    runs-on: macos-15
+    runs-on: macos-26
     needs: bridge
     steps:
       - name: Export GitHub Actions cache environment variables
